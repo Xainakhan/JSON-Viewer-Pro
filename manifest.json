@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "JSON Viewer Pro",
+  "version": "0.1.0",
+  "description": "View and explore JSON in a clean, searchable tree.",
+  "action": {},
+  "background": {
+    "service_worker": "background.js"
+  }
+}

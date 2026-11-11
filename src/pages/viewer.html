@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>JSON Viewer Pro</title>
+    <link rel="stylesheet" href="viewer.css" />
+  </head>
+  <body>
+    <main class="viewer-shell">
+      <header class="viewer-header">
+        <p class="eyebrow">JSON Viewer Pro</p>
+        <h1>Explore JSON clearly.</h1>
+        <p class="intro">Paste JSON below to format and inspect it.</p>
+      </header>
+
+      <section class="input-panel" aria-labelledby="input-heading">
+        <div class="section-heading">
+          <h2 id="input-heading">JSON input</h2>
+          <button id="format-button" class="primary-button" type="button">Format</button>
+        </div>
+        <label class="sr-only" for="json-input">Paste JSON</label>
+        <textarea
+          id="json-input"
+          name="json-input"
+          placeholder='Paste JSON here, for example: { "name": "Ada" }'
+          spellcheck="false"
+        ></textarea>
+      </section>
+
+      <section class="output-panel" aria-labelledby="output-heading">
+        <div class="section-heading">
+          <h2 id="output-heading">Output</h2>
+        </div>
+        <div id="json-output" class="output-area" aria-live="polite" role="status"></div>
+      </section>
+    </main>
+
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>
