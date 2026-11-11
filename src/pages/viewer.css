@@ -150,6 +150,12 @@ button:focus-visible {
   display: flex;
   align-items: center;
   color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.error-box {
+  border-color: #dc2626;
+  color: #b91c1c;
 }
 
 .sr-only {
