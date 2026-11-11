@@ -153,6 +153,110 @@ button:focus-visible {
   white-space: pre-wrap;
 }
 
+.json-tree {
+  display: block;
+  overflow: auto;
+  white-space: normal;
+}
+
+.tree-item {
+  cursor: default;
+  outline: none;
+}
+
+.tree-item:focus > .tree-row {
+  border-radius: 4px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.tree-row {
+  display: inline-flex;
+  min-height: 1.7em;
+  align-items: baseline;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.tree-group {
+  margin-left: 20px;
+}
+
+.tree-toggle {
+  width: 20px;
+  color: var(--text-secondary);
+  transition: transform 120ms ease;
+}
+
+[aria-expanded="true"] > .tree-row .tree-toggle {
+  transform: rotate(90deg);
+}
+
+.tree-toggle-placeholder {
+  flex: 0 0 20px;
+}
+
+.tree-key {
+  color: #7c3aed;
+}
+
+.tree-separator {
+  color: var(--text-secondary);
+}
+
+.value-string {
+  color: #047857;
+}
+
+.value-number {
+  color: #b45309;
+}
+
+.value-boolean {
+  color: #be123c;
+}
+
+.value-null {
+  color: #7c3aed;
+}
+
+.value-object,
+.value-array {
+  color: var(--text-secondary);
+}
+
+.show-more-button {
+  display: block;
+  margin: 4px 0 4px 20px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--surface-background);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tree-key {
+    color: #c4b5fd;
+  }
+
+  .value-string {
+    color: #6ee7b7;
+  }
+
+  .value-number {
+    color: #fcd34d;
+  }
+
+  .value-boolean {
+    color: #fda4af;
+  }
+
+  .value-null {
+    color: #d8b4fe;
+  }
+}
+
 .error-box {
   border-color: #dc2626;
   color: #b91c1c;

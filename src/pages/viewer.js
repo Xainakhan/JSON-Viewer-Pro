@@ -1,4 +1,6 @@
 import { buildErrorExcerpt, parseJson } from "../core/parser.js";
+import { createNode } from "../core/tree-model.js";
+import { renderTree } from "../ui/tree-renderer.js";
 
 const formatButton = document.querySelector("#format-button");
 const inputArea = document.querySelector("#json-input");
@@ -13,7 +15,7 @@ if (
     const result = parseJson(inputArea.value);
 
     if (result.ok) {
-      showValidJson(outputArea, result.value);
+      showTree(outputArea, result.value);
       return;
     }
 
@@ -22,19 +24,15 @@ if (
 }
 
 /**
- * Shows the temporary success state until tree rendering is available.
+ * Builds the root node and delegates JSON presentation to the tree renderer.
  *
  * @param {HTMLElement} outputArea Output container.
  * @param {unknown} value Parsed JSON value.
  * @returns {void}
  */
-function showValidJson(outputArea, value) {
-  const count = getTopLevelCount(value);
-  const unit = Array.isArray(value) ? "items" : "keys";
-
+function showTree(outputArea, value) {
   outputArea.classList.remove("error-box");
-  outputArea.setAttribute("role", "status");
-  outputArea.textContent = `Valid JSON: ${count} top-level ${unit}.`;
+  renderTree(outputArea, createNode({ key: null, value, path: [] }));
 }
 
 /**
@@ -48,25 +46,8 @@ function showValidJson(outputArea, value) {
 function showParseError(outputArea, text, error) {
   const excerpt = buildErrorExcerpt(text, error.line, error.column);
 
+  outputArea.classList.remove("json-tree");
   outputArea.classList.add("error-box");
   outputArea.setAttribute("role", "alert");
   outputArea.textContent = excerpt ? `${error.message}\n\n${excerpt}` : error.message;
-}
-
-/**
- * Counts object keys or array items without changing primitive values.
- *
- * @param {unknown} value Parsed JSON value.
- * @returns {number} Number of top-level entries.
- */
-function getTopLevelCount(value) {
-  if (Array.isArray(value)) {
-    return value.length;
-  }
-
-  if (value !== null && typeof value === "object") {
-    return Object.keys(value).length;
-  }
-
-  return 0;
 }
