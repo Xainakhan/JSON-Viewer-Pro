@@ -1,19 +1,25 @@
 import { getChildren } from "../core/tree-model.js";
 import { CHILD_RENDER_BATCH_SIZE, STRING_PREVIEW_LENGTH } from "../shared/constants.js";
-import { ValueType } from "../shared/enums.js";
+import { CopyTarget, ValueType } from "../shared/enums.js";
 
 const ROOT_NODE_LABEL = "root";
 const TREE_ITEM_SELECTOR = '[role="treeitem"]';
 const NODE_ID_ATTRIBUTE = "data-tree-node-id";
+const rendererControllers = new WeakMap();
 
 /**
  * Renders a lazy, keyboard-accessible JSON tree into a container.
  *
  * @param {HTMLElement} container Target element.
  * @param {import("../core/tree-model.js").JsonTreeNode} rootNode Root model node.
+ * @param {TreeRenderOptions} [options] Interaction callbacks.
  * @returns {void}
  */
-export function renderTree(container, rootNode) {
+export function renderTree(container, rootNode, options = {}) {
+  rendererControllers.get(container)?.abort();
+  const eventController = new AbortController();
+  rendererControllers.set(container, eventController);
+
   const stateById = new Map();
   let nextNodeId = 0;
 
@@ -26,32 +32,49 @@ export function renderTree(container, rootNode) {
   const rootState = createNodeState(rootNode, container);
   expandNode(rootState);
 
-  container.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) {
-      return;
-    }
+  container.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
 
-    const loadMoreButton = target.closest("[data-load-more-node-id]");
-    if (loadMoreButton instanceof HTMLButtonElement) {
-      loadNextBatch(loadMoreButton.dataset.loadMoreNodeId);
-      return;
-    }
+      const loadMoreButton = target.closest("[data-load-more-node-id]");
+      if (loadMoreButton instanceof HTMLButtonElement) {
+        loadNextBatch(loadMoreButton.dataset.loadMoreNodeId);
+        return;
+      }
 
-    const treeItem = target.closest(TREE_ITEM_SELECTOR);
-    if (treeItem instanceof HTMLElement) {
-      toggleNode(treeItem.dataset.treeNodeId);
-    }
-  });
+      const copyButton = target.closest("[data-copy-target]");
+      if (copyButton instanceof HTMLButtonElement) {
+        const treeItem = copyButton.closest(TREE_ITEM_SELECTOR);
+        if (treeItem instanceof HTMLElement) {
+          copyNode(copyButton.dataset.copyTarget, treeItem.dataset.treeNodeId);
+        }
+        return;
+      }
 
-  container.addEventListener("keydown", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement) || target.getAttribute("role") !== "treeitem") {
-      return;
-    }
+      const treeItem = target.closest(TREE_ITEM_SELECTOR);
+      if (treeItem instanceof HTMLElement) {
+        toggleNode(treeItem.dataset.treeNodeId);
+      }
+    },
+    { signal: eventController.signal },
+  );
 
-    handleKeyboardNavigation(event, target);
-  });
+  container.addEventListener(
+    "keydown",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.getAttribute("role") !== "treeitem") {
+        return;
+      }
+
+      handleKeyboardNavigation(event, target);
+    },
+    { signal: eventController.signal },
+  );
 
   /**
    * Registers a node and creates its single focusable treeitem.
@@ -182,6 +205,22 @@ export function renderTree(container, rootNode) {
   }
 
   /**
+   * Delegates copying to the page controller so the renderer stays independent of clipboard APIs.
+   *
+   * @param {string | undefined} target Requested copy target.
+   * @param {string | undefined} nodeId Registered node id.
+   * @returns {void}
+   */
+  function copyNode(target, nodeId) {
+    const state = nodeId === undefined ? undefined : stateById.get(nodeId);
+    if (!state || target === undefined || options.onCopy === undefined) {
+      return;
+    }
+
+    Promise.resolve(options.onCopy(target, state.node)).catch(() => undefined);
+  }
+
+  /**
    * Adds a progressively-disclosed child batch button when items remain.
    *
    * @param {TreeNodeState} state Expanded node state.
@@ -289,6 +328,11 @@ export function renderTree(container, rootNode) {
 }
 
 /**
+ * @typedef {object} TreeRenderOptions
+ * @property {(target: string, node: import("../core/tree-model.js").JsonTreeNode) => void | Promise<void>} [onCopy]
+ */
+
+/**
  * @typedef {object} TreeNodeState
  * @property {string} id Registered node id.
  * @property {import("../core/tree-model.js").JsonTreeNode} node Model node.
@@ -314,16 +358,52 @@ function appendNodeContent(treeItem, node) {
   toggle.setAttribute("aria-hidden", "true");
   toggle.textContent = node.isExpandable ? "▸" : "";
 
-  const key = document.createElement("span");
+  const key = document.createElement("button");
   key.className = "tree-key";
+  key.type = "button";
+  key.dataset.copyTarget = CopyTarget.PATH;
+  key.setAttribute("aria-label", "Copy path");
   key.textContent = node.key === null ? ROOT_NODE_LABEL : String(node.key);
 
   const separator = document.createElement("span");
   separator.className = "tree-separator";
   separator.textContent = ": ";
 
-  row.append(toggle, key, separator, createValueElement(node));
+  row.append(toggle, key, separator, createValueElement(node), createActionButtons());
   treeItem.append(row);
+}
+
+/**
+ * Creates explicit copy actions that are revealed only during node interaction.
+ *
+ * @returns {HTMLElement} Action-button container.
+ */
+function createActionButtons() {
+  const actions = document.createElement("span");
+  actions.className = "tree-actions";
+  actions.append(
+    createCopyButton(CopyTarget.PATH, "Copy path"),
+    createCopyButton(CopyTarget.VALUE, "Copy value"),
+    createCopyButton(CopyTarget.SUBTREE, "Copy subtree"),
+  );
+  return actions;
+}
+
+/**
+ * Creates one accessible copy button for a tree node.
+ *
+ * @param {string} target Copy target.
+ * @param {string} label Accessible action label.
+ * @returns {HTMLButtonElement} Copy action button.
+ */
+function createCopyButton(target, label) {
+  const button = document.createElement("button");
+  button.className = "tree-action";
+  button.type = "button";
+  button.dataset.copyTarget = target;
+  button.setAttribute("aria-label", label);
+  button.textContent = label;
+  return button;
 }
 
 /**

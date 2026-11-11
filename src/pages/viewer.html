@@ -15,6 +15,15 @@
         <p class="intro">Paste JSON below to format and inspect it.</p>
       </header>
 
+      <section class="viewer-toolbar" aria-label="Path options">
+        <label for="path-format">Copy paths as</label>
+        <select id="path-format" name="path-format">
+          <option value="dot">Dot path</option>
+          <option value="jsonPath">JSONPath</option>
+          <option value="optionalChaining">Optional chaining</option>
+        </select>
+      </section>
+
       <section class="input-panel" aria-labelledby="input-heading">
         <div class="section-heading">
           <h2 id="input-heading">JSON input</h2>
@@ -35,6 +44,7 @@
         </div>
         <div id="json-output" class="output-area" aria-live="polite" role="status"></div>
       </section>
+      <div id="copy-toast" class="copy-toast" aria-live="polite" role="status"></div>
     </main>
 
     <script type="module" src="viewer.js"></script>

@@ -55,6 +55,20 @@ export const PathFormat = Object.freeze({
   OPTIONAL_CHAINING: "optionalChaining",
 });
 
+/** @typedef {"path" | "value" | "subtree"} CopyTargetValue */
+
+/**
+ * Data representations that can be copied from a tree node.
+ *
+ * @readonly
+ * @enum {CopyTargetValue}
+ */
+export const CopyTarget = Object.freeze({
+  PATH: "path",
+  VALUE: "value",
+  SUBTREE: "subtree",
+});
+
 /** @typedef {"emptyInput" | "invalidJson"} ParseErrorCodeValue */
 
 /**
@@ -79,4 +93,5 @@ export const ParseErrorCode = Object.freeze({
 export const StorageKey = Object.freeze({
   THEME: "theme",
   VIEW_MODE: "viewMode",
+  PATH_FORMAT: "pathFormat",
 });
