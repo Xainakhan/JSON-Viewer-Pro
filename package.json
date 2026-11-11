@@ -1,0 +1,28 @@
+{
+  "name": "json-viewer-pro",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Development tooling for JSON Viewer Pro.",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint src test --ext .js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "prettier": "^3.5.3"
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "node": true,
+      "webextensions": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+      "ecmaVersion": 2022,
+      "sourceType": "module"
+    }
+  }
+}
