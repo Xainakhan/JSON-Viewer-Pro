@@ -112,6 +112,10 @@ function getCopyText(target, value, path) {
     return path;
   }
 
+  if (target === CopyTarget.VALUE && typeof value === "string") {
+    return value;
+  }
+
   return JSON.stringify(value, null, 2);
 }
 

@@ -95,3 +95,16 @@ export const StorageKey = Object.freeze({
   VIEW_MODE: "viewMode",
   PATH_FORMAT: "pathFormat",
 });
+
+/** @typedef {"key" | "value"} MatchFieldValue */
+
+/**
+ * Parts of a JSON node that a search can match.
+ *
+ * @readonly
+ * @enum {MatchFieldValue}
+ */
+export const MatchField = Object.freeze({
+  KEY: "key",
+  VALUE: "value",
+});
