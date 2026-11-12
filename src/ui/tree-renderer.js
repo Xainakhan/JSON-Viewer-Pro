@@ -5,6 +5,7 @@ import { CopyTarget, ValueType } from "../shared/enums.js";
 const ROOT_NODE_LABEL = "root";
 const TREE_ITEM_SELECTOR = '[role="treeitem"]';
 const NODE_ID_ATTRIBUTE = "data-tree-node-id";
+const SEARCH_MATCH_CLASS = "search-match";
 const rendererControllers = new WeakMap();
 
 /**
@@ -13,7 +14,7 @@ const rendererControllers = new WeakMap();
  * @param {HTMLElement} container Target element.
  * @param {import("../core/tree-model.js").JsonTreeNode} rootNode Root model node.
  * @param {TreeRenderOptions} [options] Interaction callbacks.
- * @returns {void}
+ * @returns {{ setHighlights: (paths: Array<Array<string | number>>) => void }} Tree controls.
  */
 export function renderTree(container, rootNode, options = {}) {
   rendererControllers.get(container)?.abort();
@@ -21,6 +22,7 @@ export function renderTree(container, rootNode, options = {}) {
   rendererControllers.set(container, eventController);
 
   const stateById = new Map();
+  const stateByPath = new Map();
   let nextNodeId = 0;
 
   container.replaceChildren();
@@ -76,6 +78,8 @@ export function renderTree(container, rootNode, options = {}) {
     { signal: eventController.signal },
   );
 
+  return { setHighlights };
+
   /**
    * Registers a node and creates its single focusable treeitem.
    *
@@ -103,6 +107,7 @@ export function renderTree(container, rootNode, options = {}) {
 
     const state = { id, node, treeItem, group: null, renderedCount: 0, isExpanded: false };
     stateById.set(id, state);
+    stateByPath.set(pathKey(node.path), state);
     return state;
   }
 
@@ -205,8 +210,64 @@ export function renderTree(container, rootNode, options = {}) {
   }
 
   /**
-   * Delegates copying to the page controller so the renderer stays independent of clipboard APIs.
+   * Expands every ancestor of a path, loading child batches until the target is rendered.
    *
+   * @param {Array<string | number>} path Node path.
+   * @returns {HTMLElement | null} Target treeitem, or null when the path does not exist.
+   */
+  function revealPath(path) {
+    let state = rootState;
+    expandNode(state);
+
+    for (let depth = 1; depth <= path.length; depth += 1) {
+      const childState = findChildState(state, path.slice(0, depth));
+      if (childState === null) {
+        return null;
+      }
+
+      state = childState;
+      if (depth < path.length) {
+        expandNode(state);
+      }
+    }
+
+    return state.treeItem;
+  }
+
+  /**
+   * Renders child batches of a parent until the requested child exists.
+   *
+   * @param {TreeNodeState} parent Expanded parent state.
+   * @param {Array<string | number>} childPath Full path of the child.
+   * @returns {TreeNodeState | null} Child state, or null when it does not exist.
+   */
+  function findChildState(parent, childPath) {
+    const key = pathKey(childPath);
+    while (!stateByPath.has(key) && parent.renderedCount < parent.node.childCount) {
+      renderNextBatch(parent);
+    }
+
+    return stateByPath.get(key) ?? null;
+  }
+
+  /**
+   * Replaces the current search highlights and reveals each matched node.
+   *
+   * @param {Array<Array<string | number>>} paths Matched node paths.
+   * @returns {void}
+   */
+  function setHighlights(paths) {
+    for (const item of container.querySelectorAll(`.${SEARCH_MATCH_CLASS}`)) {
+      item.classList.remove(SEARCH_MATCH_CLASS);
+    }
+
+    for (const path of paths) {
+      revealPath(path)?.classList.add(SEARCH_MATCH_CLASS);
+    }
+  }
+
+  /**
+   * Delegates copying to the page controller so the renderer stays independent of clipboard APIs.   *
    * @param {string | undefined} target Requested copy target.
    * @param {string | undefined} nodeId Registered node id.
    * @returns {void}
@@ -444,4 +505,14 @@ function truncateText(text) {
   }
 
   return `${text.slice(0, STRING_PREVIEW_LENGTH)}…`;
+}
+
+/**
+ * Builds an unambiguous map key from path segments, keeping "0" and 0 distinct.
+ *
+ * @param {Array<string | number>} path Node path.
+ * @returns {string} Path key.
+ */
+function pathKey(path) {
+  return JSON.stringify(path);
 }
