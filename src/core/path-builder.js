@@ -4,11 +4,11 @@ const IDENTIFIER_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const JSON_PATH_ROOT = "$";
 
 /**
- * Formats path segments in a supported JSON-navigation syntax.
+ * Formats path segments as a dot path, JSONPath, or optional-chaining expression.
  *
- * @param {Array<string | number>} segments Object-key and array-index segments.
- * @param {string} format Desired path format.
- * @returns {string} Formatted path.
+ * @param {Array<string | number>} segments Object keys (strings) and array indexes (numbers).
+ * @param {string} format One of PathFormat.
+ * @returns {string} The formatted path.
  */
 export function formatPath(segments, format) {
   if (segments.length === 0) {
@@ -26,80 +26,44 @@ export function formatPath(segments, format) {
   return formatDotPath(segments);
 }
 
-/**
- * Formats a path that starts at an implicit JavaScript root.
- *
- * @param {Array<string | number>} segments Path segments.
- * @returns {string} Dot-format path.
- */
 function formatDotPath(segments) {
   return segments.map((segment, index) => formatDotSegment(segment, index === 0)).join("");
 }
 
-/**
- * Formats a JSONPath expression rooted at `$`.
- *
- * @param {Array<string | number>} segments Path segments.
- * @returns {string} JSONPath expression.
- */
 function formatJsonPath(segments) {
   return `${JSON_PATH_ROOT}${segments.map((segment) => formatDotSegment(segment, false)).join("")}`;
 }
 
-/**
- * Formats a null-safe JavaScript property-access path.
- *
- * @param {Array<string | number>} segments Path segments.
- * @returns {string} Optional-chaining path.
- */
 function formatOptionalChainingPath(segments) {
   return segments.map((segment, index) => formatOptionalSegment(segment, index === 0)).join("");
 }
 
-/**
- * Formats a segment for dot paths and JSONPath.
- *
- * @param {string | number} segment Path segment.
- * @param {boolean} isRoot Whether this is the first segment.
- * @returns {string} Formatted segment.
- */
-function formatDotSegment(segment, isRoot) {
+function formatDotSegment(segment, isFirst) {
   if (typeof segment === "number") {
     return `[${segment}]`;
   }
 
   if (isIdentifierSafe(segment)) {
-    return isRoot ? segment : `.${segment}`;
+    return isFirst ? segment : `.${segment}`;
   }
 
   return `[${JSON.stringify(segment)}]`;
 }
 
-/**
- * Formats a segment for optional chaining.
- *
- * @param {string | number} segment Path segment.
- * @param {boolean} isRoot Whether this is the first segment.
- * @returns {string} Formatted segment.
- */
-function formatOptionalSegment(segment, isRoot) {
+function formatOptionalSegment(segment, isFirst) {
+  const separator = isFirst ? "" : "?.";
+
   if (typeof segment === "number") {
-    return isRoot ? `[${segment}]` : `?.[${segment}]`;
+    return `${separator}[${segment}]`;
   }
 
   if (isIdentifierSafe(segment)) {
-    return isRoot ? segment : `?.${segment}`;
+    return `${separator}${segment}`;
   }
 
-  return isRoot ? `[${JSON.stringify(segment)}]` : `?.[${JSON.stringify(segment)}]`;
+  return `${separator}[${JSON.stringify(segment)}]`;
 }
 
-/**
- * Restricts dot notation to unambiguous JavaScript identifiers.
- *
- * @param {string} key Object key.
- * @returns {boolean} Whether dot notation is safe.
- */
 function isIdentifierSafe(key) {
   return IDENTIFIER_PATTERN.test(key);
 }
