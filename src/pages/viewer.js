@@ -1,162 +1,177 @@
+import { formatRaw } from "../core/raw-formatter.js";
 import { buildErrorExcerpt, parseJson } from "../core/parser.js";
 import { formatPath } from "../core/path-builder.js";
 import { findMatches } from "../core/search.js";
 import { createNode } from "../core/tree-model.js";
-import { SEARCH_DEBOUNCE_MS } from "../shared/constants.js";
-import { StorageKey, PathFormat, CopyTarget } from "../shared/enums.js";
-import { getStoredValue, setStoredValue } from "../shared/storage.js";
+import { EXPAND_ALL_NODE_LIMIT, SEARCH_DEBOUNCE_MS } from "../shared/constants.js";
+import { CopyTarget, StorageKey, Theme, ViewMode } from "../shared/enums.js";
+import {
+  getPathFormatPreference,
+  getThemePreference,
+  getViewModePreference,
+} from "../shared/preferences.js";
+import { setStoredValue } from "../shared/storage.js";
 import { copyText } from "../ui/copy.js";
 import { renderTree } from "../ui/tree-renderer.js";
 
 const formatButton = document.querySelector("#format-button");
 const inputArea = document.querySelector("#json-input");
 const outputArea = document.querySelector("#json-output");
+const treeOutput = document.querySelector("#tree-output");
+const rawOutput = document.querySelector("#raw-output");
+const errorOutput = document.querySelector("#error-output");
 const pathFormatSelect = document.querySelector("#path-format");
 const copyToast = document.querySelector("#copy-toast");
 const searchInput = document.querySelector("#search-input");
 const searchStatus = document.querySelector("#search-status");
+const expandAllButton = document.querySelector("#expand-all-button");
+const collapseAllButton = document.querySelector("#collapse-all-button");
+const treeViewButton = document.querySelector("#tree-view-button");
+const rawViewButton = document.querySelector("#raw-view-button");
+const themeToggleButton = document.querySelector("#theme-toggle-button");
 let pathFormat = getPathFormatPreference();
+let viewMode = getViewModePreference();
+let theme = getThemePreference();
 let currentValue = null;
 let treeControls = null;
 let searchTimer;
 
-if (searchInput instanceof HTMLInputElement) {
-  searchInput.addEventListener("input", () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(runSearch, SEARCH_DEBOUNCE_MS);
-  });
-}
-if (pathFormatSelect instanceof HTMLSelectElement) {
-  pathFormatSelect.value = pathFormat;
-  pathFormatSelect.addEventListener("change", () => {
-    pathFormat = pathFormatSelect.value;
-    if (!setStoredValue(StorageKey.PATH_FORMAT, pathFormat)) {
-      showCopyToast("Could not save the path format preference.");
-    }
-  });
-}
+applyTheme(theme);
+configureToolbar();
+void loadSourceFromQuery();
 
-if (
-  formatButton instanceof HTMLButtonElement &&
-  inputArea instanceof HTMLTextAreaElement &&
-  outputArea instanceof HTMLElement
-) {
-  formatButton.addEventListener("click", () => {
-    const result = parseJson(inputArea.value);
-
-    if (result.ok) {
-      showTree(outputArea, result.value);
-      return;
-    }
-
-    showParseError(outputArea, inputArea.value, result.error);
-  });
+function configureToolbar() {
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(runSearch, SEARCH_DEBOUNCE_MS);
+    });
+  }
+  if (pathFormatSelect instanceof HTMLSelectElement) {
+    pathFormatSelect.value = pathFormat;
+    pathFormatSelect.addEventListener("change", () => {
+      pathFormat = pathFormatSelect.value;
+      if (!setStoredValue(StorageKey.PATH_FORMAT, pathFormat))
+        showCopyToast("Could not save the path format preference.");
+    });
+  }
+  expandAllButton?.addEventListener("click", expandAll);
+  collapseAllButton?.addEventListener("click", () => treeControls?.collapseAll());
+  treeViewButton?.addEventListener("click", () => setViewMode(ViewMode.TREE));
+  rawViewButton?.addEventListener("click", () => setViewMode(ViewMode.RAW));
+  themeToggleButton?.addEventListener("click", toggleTheme);
+  formatButton?.addEventListener("click", formatInput);
+  updateViewControls();
+  updateThemeButton();
 }
 
-/**
- * Builds the root node and delegates JSON presentation to the tree renderer.
- *
- * @param {HTMLElement} outputArea Output container.
- * @param {unknown} value Parsed JSON value.
- * @returns {void}
- */
-function showTree(outputArea, value) {
+function formatInput() {
+  if (!(inputArea instanceof HTMLTextAreaElement) || !(outputArea instanceof HTMLElement)) return;
+  const result = parseJson(inputArea.value);
+  if (result.ok) return showValue(result.value);
+  showParseError(outputArea, inputArea.value, result.error);
+}
+
+function showValue(value) {
+  if (!(outputArea instanceof HTMLElement) || !(treeOutput instanceof HTMLElement)) return;
   outputArea.classList.remove("error-box");
+  if (errorOutput instanceof HTMLPreElement) errorOutput.hidden = true;
   currentValue = value;
-  treeControls = renderTree(outputArea, createNode({ key: null, value, path: [] }), { onCopy });
+  treeControls = renderTree(treeOutput, createNode({ key: null, value, path: [] }), { onCopy });
+  if (rawOutput instanceof HTMLPreElement) rawOutput.textContent = formatRaw(value);
+  updateViewControls();
   runSearch();
 }
 
-/**
- * Shows a safely-rendered, accessible parsing failure.
- *
- * @param {HTMLElement} outputArea Output container.
- * @param {string} text JSON source text.
- * @param {{ message: string, line: number | null, column: number | null }} error Parse error details.
- * @returns {void}
- */
-function showParseError(outputArea, text, error) {
+function showParseError(output, text, error) {
   treeControls = null;
+  currentValue = null;
+  updateViewControls();
   setSearchStatus("");
   const excerpt = buildErrorExcerpt(text, error.line, error.column);
-  outputArea.classList.remove("json-tree");
-  outputArea.classList.add("error-box");
-  outputArea.setAttribute("role", "alert");
-  outputArea.textContent = excerpt ? `${error.message}\n\n${excerpt}` : error.message;
+  output.classList.add("error-box");
+  if (errorOutput instanceof HTMLPreElement) {
+    errorOutput.textContent = excerpt ? `${error.message}\n\n${excerpt}` : error.message;
+    errorOutput.hidden = false;
+  }
 }
 
-/**
- * Uses a persisted format only when it is one of the formats this version supports.
- *
- * @returns {string} Supported path format.
- */
-function getPathFormatPreference() {
-  const storedFormat = getStoredValue(StorageKey.PATH_FORMAT, PathFormat.DOT);
-  return Object.values(PathFormat).includes(storedFormat) ? storedFormat : PathFormat.DOT;
+function expandAll() {
+  if (treeControls?.expandAll().complete === false) {
+    showCopyToast(
+      `Expanded the first ${EXPAND_ALL_NODE_LIMIT} nodes. Use search or expand nodes individually.`,
+    );
+  }
 }
 
-/**
- * Copies a node representation selected by the tree renderer.
- *
- * @param {string} target Requested copy target.
- * @param {import("../core/tree-model.js").JsonTreeNode} node JSON tree node.
- * @returns {Promise<void>}
- */
+function setViewMode(mode) {
+  viewMode = mode;
+  setStoredValue(StorageKey.VIEW_MODE, mode);
+  updateViewControls();
+  if (mode === ViewMode.RAW) setSearchStatus("Search highlighting is unavailable in raw view.");
+  else runSearch();
+}
+
+function updateViewControls() {
+  const hasTree = treeControls !== null;
+  if (treeOutput instanceof HTMLElement) treeOutput.hidden = viewMode !== ViewMode.TREE || !hasTree;
+  if (rawOutput instanceof HTMLPreElement) rawOutput.hidden = viewMode !== ViewMode.RAW || !hasTree;
+  if (errorOutput instanceof HTMLPreElement) errorOutput.hidden = hasTree;
+  if (treeViewButton instanceof HTMLButtonElement)
+    treeViewButton.setAttribute("aria-pressed", String(viewMode === ViewMode.TREE));
+  if (rawViewButton instanceof HTMLButtonElement)
+    rawViewButton.setAttribute("aria-pressed", String(viewMode === ViewMode.RAW));
+  const disabled = !hasTree || viewMode === ViewMode.RAW;
+  if (expandAllButton instanceof HTMLButtonElement) expandAllButton.disabled = disabled;
+  if (collapseAllButton instanceof HTMLButtonElement) collapseAllButton.disabled = disabled;
+}
+
+function toggleTheme() {
+  theme = theme === Theme.DARK ? Theme.LIGHT : Theme.DARK;
+  applyTheme(theme);
+  setStoredValue(StorageKey.THEME, theme);
+  updateThemeButton();
+}
+
+function applyTheme(nextTheme) {
+  if (nextTheme === null) delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = nextTheme;
+}
+
+function updateThemeButton() {
+  if (!(themeToggleButton instanceof HTMLButtonElement)) return;
+  const effectiveTheme =
+    theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? Theme.DARK : Theme.LIGHT);
+  themeToggleButton.textContent =
+    effectiveTheme === Theme.DARK ? "Switch to light theme" : "Switch to dark theme";
+}
+
 async function onCopy(target, node) {
   const path = formatPath(node.path, pathFormat);
-  const text = getCopyText(target, node.value, path);
-  const result = await copyText(text);
-
-  if (!result.ok) {
-    showCopyToast(result.error);
-    return;
-  }
-
-  showCopyToast(target === CopyTarget.PATH ? `Copied: ${path}` : "Copied to clipboard.");
+  const result = await copyText(getCopyText(target, node.value, path));
+  showCopyToast(
+    result.ok
+      ? target === CopyTarget.PATH
+        ? `Copied: ${path}`
+        : "Copied to clipboard."
+      : result.error,
+  );
 }
 
-/**
- * Converts a copy request to safe plain text.
- *
- * @param {string} target Requested copy target.
- * @param {unknown} value Node value.
- * @param {string} path Formatted node path.
- * @returns {string} Clipboard text.
- */
 function getCopyText(target, value, path) {
-  if (target === CopyTarget.PATH) {
-    return path;
-  }
-
-  if (target === CopyTarget.VALUE && typeof value === "string") {
-    return value;
-  }
-  next;
-
+  if (target === CopyTarget.PATH) return path;
+  if (target === CopyTarget.VALUE && typeof value === "string") return value;
   return JSON.stringify(value, null, 2);
 }
 
-/**
- * Announces copying feedback without interpreting copied JSON as markup.
- *
- * @param {string} message Toast text.
- * @returns {void}
- */
 function showCopyToast(message) {
-  if (copyToast instanceof HTMLElement) {
-    copyToast.textContent = message;
-  }
+  if (copyToast instanceof HTMLElement) copyToast.textContent = message;
 }
-/**
- * Highlights matches for the current search text in the rendered tree.
- *
- * @returns {void}
- */
-function runSearch() {
-  if (treeControls === null || !(searchInput instanceof HTMLInputElement)) {
-    return;
-  }
 
+function runSearch() {
+  if (treeControls === null || !(searchInput instanceof HTMLInputElement)) return;
+  if (viewMode === ViewMode.RAW)
+    return setSearchStatus("Search highlighting is unavailable in raw view.");
   const { matches, truncated } = findMatches(currentValue, searchInput.value);
   treeControls.setHighlights(matches.map((match) => match.path));
   setSearchStatus(
@@ -164,29 +179,26 @@ function runSearch() {
   );
 }
 
-/**
- * Summarizes a search result for the status text.
- *
- * @param {number} count Number of matches.
- * @param {boolean} truncated Whether more matches exist than were returned.
- * @returns {string} Status text.
- */
 function describeMatches(count, truncated) {
-  if (count === 0) {
-    return "No matches";
-  }
-
+  if (count === 0) return "No matches";
   return `${count}${truncated ? "+" : ""} ${count === 1 ? "match" : "matches"}`;
 }
 
-/**
- * Updates the search status text.
- *
- * @param {string} message Status text.
- * @returns {void}
- */
 function setSearchStatus(message) {
-  if (searchStatus instanceof HTMLElement) {
-    searchStatus.textContent = message;
+  if (searchStatus instanceof HTMLElement) searchStatus.textContent = message;
+}
+
+async function loadSourceFromQuery() {
+  const sourceUrl = new URLSearchParams(location.search).get("source");
+  if (sourceUrl === null || !(inputArea instanceof HTMLTextAreaElement)) return;
+
+  setSearchStatus("Loading JSON from the active tab…");
+  try {
+    const response = await fetch(sourceUrl);
+    if (!response.ok) throw new Error("The page could not be loaded.");
+    inputArea.value = await response.text();
+    formatInput();
+  } catch {
+    setSearchStatus("Could not load JSON from the active tab. Paste it here instead.");
   }
 }

@@ -9,7 +9,7 @@ A lightweight Manifest V3 Chrome extension for viewing raw JSON as a clean, sear
 - Copy key paths as dot paths, JSONPath, or optional-chaining paths
 - Helpful invalid-JSON errors with positions
 - Raw/pretty display, expand/collapse, and light/dark theme controls
-- Format a raw-JSON page directly from the Chrome toolbar
+- Format a raw-JSON HTTP(S) page directly from the Chrome toolbar
 
 ## Screenshots
 
@@ -24,7 +24,7 @@ _Screenshots will be added as the viewer is built._
 
 ## Usage
 
-Open the extension viewer to paste JSON, or use the extension toolbar icon while a tab displays raw JSON.
+Open the extension viewer to paste JSON, or use the extension toolbar icon while an HTTP(S) tab displays raw JSON. The viewer loads the active page into the input automatically; if the request is unavailable, paste the JSON manually.
 
 ## Project structure
 
@@ -48,13 +48,6 @@ json-viewer-pro/
 2. A parser validates the input and reports useful errors.
 3. A lazy tree model renders only the nodes a user opens.
 4. The UI searches, formats, and copies safe paths without injecting JSON as HTML.
-
-## Roadmap
-
-- Build the viewer page and JSON parser
-- Add lazy tree rendering and path copying
-- Add search, themes, and toolbar controls
-- Add raw-tab formatting and automated tests
 
 ## License
 

@@ -15,16 +15,23 @@
         <p class="intro">Paste JSON below to format and inspect it.</p>
       </header>
 
-      <section class="viewer-toolbar" aria-label="Path options">
+      <section class="viewer-toolbar" role="toolbar" aria-label="Viewer controls">
         <label for="path-format">Copy paths as</label>
         <select id="path-format" name="path-format">
           <option value="dot">Dot path</option>
           <option value="jsonPath">JSONPath</option>
           <option value="optionalChaining">Optional chaining</option>
         </select>
+        <button id="expand-all-button" type="button" disabled>Expand all</button>
+        <button id="collapse-all-button" type="button" disabled>Collapse all</button>
+        <span class="view-mode-controls" aria-label="View mode">
+          <button id="tree-view-button" type="button" aria-pressed="true">Tree</button>
+          <button id="raw-view-button" type="button" aria-pressed="false">Raw</button>
+        </span>
+        <button id="theme-toggle-button" type="button">Switch to dark theme</button>
       </section>
 
-      <section class="viewer-toolbar" aria-label="Search">
+      <section class="viewer-toolbar" role="toolbar" aria-label="Search">
         <label for="search-input">Search</label>
         <input
           id="search-input"
@@ -54,7 +61,11 @@
         <div class="section-heading">
           <h2 id="output-heading">Output</h2>
         </div>
-        <div id="json-output" class="output-area" aria-live="polite" role="status"></div>
+        <div id="json-output" class="output-area" aria-live="polite" role="status">
+          <div id="tree-output"></div>
+          <pre id="raw-output" class="raw-output" hidden></pre>
+          <pre id="error-output" class="error-output" hidden></pre>
+        </div>
       </section>
       <div id="copy-toast" class="copy-toast" aria-live="polite" role="status"></div>
     </main>

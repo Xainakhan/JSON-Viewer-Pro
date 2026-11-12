@@ -3,8 +3,13 @@
   "name": "JSON Viewer Pro",
   "version": "0.1.0",
   "description": "View and explore JSON in a clean, searchable tree.",
-  "action": {},
+  "action": {
+    "default_title": "Open JSON Viewer Pro"
+  },
+  "permissions": ["tabs"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   }
 }

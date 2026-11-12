@@ -1,5 +1,9 @@
 import { getChildren } from "../core/tree-model.js";
-import { CHILD_RENDER_BATCH_SIZE, STRING_PREVIEW_LENGTH } from "../shared/constants.js";
+import {
+  CHILD_RENDER_BATCH_SIZE,
+  EXPAND_ALL_NODE_LIMIT,
+  STRING_PREVIEW_LENGTH,
+} from "../shared/constants.js";
 import { CopyTarget, ValueType } from "../shared/enums.js";
 
 const ROOT_NODE_LABEL = "root";
@@ -14,7 +18,7 @@ const rendererControllers = new WeakMap();
  * @param {HTMLElement} container Target element.
  * @param {import("../core/tree-model.js").JsonTreeNode} rootNode Root model node.
  * @param {TreeRenderOptions} [options] Interaction callbacks.
- * @returns {{ setHighlights: (paths: Array<Array<string | number>>) => void }} Tree controls.
+ * @returns {{ setHighlights: (paths: Array<Array<string | number>>) => void, expandAll: () => { complete: boolean }, collapseAll: () => void }} Tree controls.
  */
 export function renderTree(container, rootNode, options = {}) {
   rendererControllers.get(container)?.abort();
@@ -78,7 +82,7 @@ export function renderTree(container, rootNode, options = {}) {
     { signal: eventController.signal },
   );
 
-  return { setHighlights };
+  return { setHighlights, expandAll, collapseAll };
 
   /**
    * Registers a node and creates its single focusable treeitem.
@@ -179,13 +183,13 @@ export function renderTree(container, rootNode, options = {}) {
    * @param {TreeNodeState} state Expanded node state.
    * @returns {void}
    */
-  function renderNextBatch(state) {
+  function renderNextBatch(state, count = CHILD_RENDER_BATCH_SIZE) {
     if (state.group === null) {
       return;
     }
 
     state.group.querySelector("[data-load-more-node-id]")?.remove();
-    const children = getChildren(state.node, state.renderedCount, CHILD_RENDER_BATCH_SIZE);
+    const children = getChildren(state.node, state.renderedCount, count);
     for (const child of children) {
       createNodeState(child, state.group);
     }
@@ -264,6 +268,56 @@ export function renderTree(container, rootNode, options = {}) {
     for (const path of paths) {
       revealPath(path)?.classList.add(SEARCH_MATCH_CLASS);
     }
+  }
+
+  /**
+   * Expands nodes iteratively while bounding the number of rendered tree nodes.
+   *
+   * @returns {{ complete: boolean }} Whether every expandable node was expanded.
+   */
+  function expandAll() {
+    const queue = [rootState];
+    let index = 0;
+
+    while (index < queue.length) {
+      const state = queue[index];
+      index += 1;
+      if (!state.node.isExpandable) {
+        continue;
+      }
+
+      expandNode(state);
+      while (state.renderedCount < state.node.childCount) {
+        const remainingCapacity = EXPAND_ALL_NODE_LIMIT - stateById.size;
+        if (remainingCapacity <= 0) {
+          return { complete: false };
+        }
+        renderNextBatch(state, Math.min(CHILD_RENDER_BATCH_SIZE, remainingCapacity));
+      }
+
+      for (const child of state.group?.querySelectorAll(`:scope > ${TREE_ITEM_SELECTOR}`) ?? []) {
+        const childState = stateById.get(child.dataset.treeNodeId);
+        if (childState) {
+          queue.push(childState);
+        }
+      }
+    }
+
+    return { complete: true };
+  }
+
+  /**
+   * Collapses all rendered expandable nodes while preserving their descendants in the DOM.
+   *
+   * @returns {void}
+   */
+  function collapseAll() {
+    for (const state of stateById.values()) {
+      if (state !== rootState) {
+        collapseNode(state);
+      }
+    }
+    expandNode(rootState);
   }
 
   /**
