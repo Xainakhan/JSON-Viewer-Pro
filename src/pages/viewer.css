@@ -271,8 +271,9 @@ button:focus-visible {
   opacity: 0;
 }
 
-.tree-item:hover .tree-actions,
-.tree-item:focus-within .tree-actions {
+.tree-row:hover .tree-actions,
+.tree-row:focus-within .tree-actions,
+.tree-item:focus > .tree-row .tree-actions {
   opacity: 1;
 }
 
